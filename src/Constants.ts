@@ -105,11 +105,10 @@ export const CONSTANTS = {
   // Only use this if a backdoor is installed in the company's server
   CompanyRequiredReputationMultiplier: 0.75,
 
-  // Also update doc/source/changelog.rst
   LatestUpdate: `
 ## v2.6.3 Dev: Last updated 3 July 2024
 
-See 2.6.2 changelog at https://github.com/bitburner-official/bitburner-src/blob/v2.6.2/src/Documentation/doc/changelog.md
+See 2.6.2 changelog at https://github.com/bitburner-official/bitburner-src/blob/v2.6.2/src/Documentation/doc/en/changelog.md
 
 ### CHANGES
 

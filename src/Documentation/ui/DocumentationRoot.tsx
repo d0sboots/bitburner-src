@@ -27,7 +27,7 @@ export function DocumentationRoot({ docPage }: { docPage?: string }): React.Reac
       }
       if (external) {
         const ver = CONSTANTS.isDevBranch ? "dev" : "stable";
-        const url = `https://github.com/bitburner-official/bitburner-src/blob/${ver}/src/Documentation/doc/${newPath}`;
+        const url = `https://github.com/bitburner-official/bitburner-src/blob/${ver}/src/Documentation/doc/en/${newPath}`;
         window.open(url, "_newtab");
         return;
       }

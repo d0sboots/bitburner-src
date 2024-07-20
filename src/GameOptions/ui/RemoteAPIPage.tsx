@@ -27,7 +27,7 @@ export const RemoteAPIPage = (): React.ReactElement => {
       </Typography>
       <Typography>
         <Link
-          href="https://github.com/bitburner-official/bitburner-src/blob/dev/src/Documentation/doc/programming/remote_api.md"
+          href="https://github.com/bitburner-official/bitburner-src/blob/dev/src/Documentation/doc/en/programming/remote_api.md"
           target="_blank"
         >
           Documentation
