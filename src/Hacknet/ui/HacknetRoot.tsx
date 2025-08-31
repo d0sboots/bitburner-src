@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo, useCallback, useRef } from "react";
 
 import { GeneralInfo } from "./GeneralInfo";
 import { HacknetNodeElem } from "./HacknetNodeElem";
@@ -33,82 +33,97 @@ export function HacknetRoot(): React.ReactElement {
   const rerender = useCycleRerender();
   const [purchaseMultiplier, setPurchaseMultiplier] = useState<number | "MAX">(PurchaseMultipliers.x1);
 
-  let totalProduction = 0;
-  for (let i = 0; i < Player.hacknetNodes.length; ++i) {
-    const node = Player.hacknetNodes[i];
-    if (hasHacknetServers()) {
-      if (node instanceof HacknetNode) throw new Error("node was hacknet node"); // should never happen
-      const hserver = GetServer(node);
-      if (!(hserver instanceof HacknetServer)) throw new Error("node was not hacknet server"); // should never happen
-      if (hserver) {
-        totalProduction += hserver.hashRate;
-      } else {
-        console.warn(`Could not find Hacknet Server object in AllServers map (i=${i})`);
-      }
-    } else {
-      if (typeof node === "string") throw new Error("node was ip string"); // should never happen
-      totalProduction += node.moneyGainRatePerSecond;
-    }
-  }
+  const hasServers = hasHacknetServers();
 
-  function handlePurchaseButtonClick(): void {
+  const handlePurchaseButtonClick = useCallback(() => {
     purchaseHacknet();
     rerender();
-  }
+  }, [rerender]);
 
   // Cost to purchase a new Hacknet Node
   let purchaseCost;
-  if (hasHacknetServers()) {
+  if (hasServers) {
     purchaseCost = getCostOfNextHacknetServer();
   } else {
     purchaseCost = getCostOfNextHacknetNode();
   }
 
   // onClick event handlers for purchase multiplier buttons
-  const purchaseMultiplierOnClicks = [
-    () => setPurchaseMultiplier(PurchaseMultipliers.x1),
-    () => setPurchaseMultiplier(PurchaseMultipliers.x5),
-    () => setPurchaseMultiplier(PurchaseMultipliers.x10),
-    () => setPurchaseMultiplier(PurchaseMultipliers.MAX),
-  ];
+  const purchaseMultiplierOnClicks = useMemo(
+    () => [
+      () => setPurchaseMultiplier(PurchaseMultipliers.x1),
+      () => setPurchaseMultiplier(PurchaseMultipliers.x5),
+      () => setPurchaseMultiplier(PurchaseMultipliers.x10),
+      () => setPurchaseMultiplier(PurchaseMultipliers.MAX),
+    ],
+    [setPurchaseMultiplier],
+  );
+
+  // Because hacknetNodes is mutated, it doesn't play nicely with useMemo. We
+  // keep a copy of it here that we can use to see if the contents have
+  // changed. This doesn't check for deep changes; if the nodes themselves
+  // change, the underlying UI components are expected to deal with that.
+  const nodesRef: React.Ref<[(string | HacknetNode)[]]> = useRef([[]]);
+  const notNull = nodesRef.current as [(string | HacknetNode)[]];
+  const oldNodes = notNull[0];
+  if (oldNodes.length !== Player.hacknetNodes.length || !oldNodes.every((v, i) => v === Player.hacknetNodes[i])) {
+    notNull[0] = [...Player.hacknetNodes];
+  }
+  const newNodes = notNull[0];
 
   // HacknetNode components
-  const nodes = Player.hacknetNodes.map((node: string | HacknetNode) => {
-    if (hasHacknetServers()) {
-      if (node instanceof HacknetNode) throw new Error("node was hacknet node"); // should never happen
-      const hserver = GetServer(node);
-      if (hserver == null) {
-        throw new Error(`Could not find Hacknet Server object in AllServers map for IP: ${node}`);
-      }
-      if (!(hserver instanceof HacknetServer)) throw new Error("node was not hacknet server"); // should never happen
-      return (
-        <HacknetServerElem
-          key={hserver.hostname}
-          node={hserver}
-          purchaseMultiplier={purchaseMultiplier}
-          rerender={rerender}
-        />
-      );
-    } else {
-      if (typeof node === "string") throw new Error("node was ip string"); // should never happen
-      return (
-        <HacknetNodeElem key={node.name} node={node} purchaseMultiplier={purchaseMultiplier} rerender={rerender} />
-      );
-    }
-  });
+  const makeNodes = useCallback(
+    () =>
+      newNodes.map((node) => {
+        if (hasServers) {
+          if (node instanceof HacknetNode) throw new Error("node was hacknet node"); // should never happen
+          const hserver = GetServer(node);
+          if (hserver == null) {
+            throw new Error(`Could not find Hacknet Server object in AllServers map for IP: ${node}`);
+          }
+          if (!(hserver instanceof HacknetServer)) throw new Error("node was not hacknet server"); // should never happen
+          return (
+            <HacknetServerElem
+              key={hserver.hostname}
+              node={hserver}
+              purchaseMultiplier={purchaseMultiplier}
+              rerender={rerender}
+            />
+          );
+        } else {
+          if (typeof node === "string") throw new Error("node was ip string"); // should never happen
+          return (
+            <HacknetNodeElem key={node.name} node={node} purchaseMultiplier={purchaseMultiplier} rerender={rerender} />
+          );
+        }
+      }),
+    [newNodes, purchaseMultiplier, rerender, hasServers],
+  );
 
   return (
     <>
-      <Typography variant="h4">Hacknet {hasHacknetServers() ? "Servers" : "Nodes"}</Typography>
-      <GeneralInfo hasHacknetServers={hasHacknetServers()} />
+      {useMemo(
+        () => (
+          <>
+            <Typography variant="h4">Hacknet {hasServers ? "Servers" : "Nodes"}</Typography>
+            <GeneralInfo hasHacknetServers={hasServers} />
+
+            <br />
+          </>
+        ),
+        [hasServers],
+      )}
+
+      {useMemo(
+        () => (
+          <PlayerInfo />
+        ),
+        [],
+      )}
 
       <br />
 
-      <PlayerInfo totalProduction={totalProduction} />
-
-      <br />
-
-      {hasHacknetServers() && (
+      {hasServers && (
         <>
           {/* 
           The usage of focusRipple in this button is intentional. Without it, after closing the modal by pressing the
@@ -123,16 +138,28 @@ export function HacknetRoot(): React.ReactElement {
         </>
       )}
 
-      <Grid container spacing={2}>
-        <Grid item xs={6}>
-          <PurchaseButton cost={purchaseCost} multiplier={purchaseMultiplier} onClick={handlePurchaseButtonClick} />
-        </Grid>
-        <Grid item xs={6}>
-          <MultiplierButtons onClicks={purchaseMultiplierOnClicks} purchaseMultiplier={purchaseMultiplier} />
-        </Grid>
-      </Grid>
+      {useMemo(
+        () => (
+          <Grid container spacing={2}>
+            <Grid item xs={6}>
+              <PurchaseButton cost={purchaseCost} multiplier={purchaseMultiplier} onClick={handlePurchaseButtonClick} />
+            </Grid>
+            <Grid item xs={6}>
+              <MultiplierButtons onClicks={purchaseMultiplierOnClicks} purchaseMultiplier={purchaseMultiplier} />
+            </Grid>
+          </Grid>
+        ),
+        [purchaseCost, purchaseMultiplier, purchaseMultiplierOnClicks, handlePurchaseButtonClick],
+      )}
 
-      <Box sx={{ display: "grid", width: "100%", gridTemplateColumns: "repeat(auto-fit, 30em)" }}>{nodes}</Box>
+      {useMemo(
+        () => (
+          <Box sx={{ display: "grid", width: "100%", gridTemplateColumns: "repeat(auto-fit, 30em)" }}>
+            {makeNodes()}
+          </Box>
+        ),
+        [makeNodes],
+      )}
       <HashUpgradeModal open={open} onClose={() => setOpen(false)} />
     </>
   );

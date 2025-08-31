@@ -15,22 +15,76 @@ import { Hashes } from "../../ui/React/Hashes";
 import { Paper, Typography } from "@mui/material";
 import { StatsTable } from "../../ui/React/StatsTable";
 import { Tooltip } from "@mui/material";
+import { GetServer } from "../../Server/AllServers";
+import { HacknetNode } from "../HacknetNode";
+import { HacknetServer } from "../HacknetServer";
+import { EventUpdater } from "../../ui/React/EventUpdater";
+import { GameCycleEvents } from "../../engine";
 
-interface IProps {
-  totalProduction: number;
+// Generator function for various global values. Declared out here so they
+// have stable identities.
+function moneySpent() {
+  return -Player.moneySourceA.hacknet_expenses || 0;
 }
 
-export function PlayerInfo(props: IProps): React.ReactElement {
-  const hasServers = hasHacknetServers();
+function moneyProduced() {
+  return Player.moneySourceA.hacknet;
+}
 
+function getHashes() {
+  return Player.hashManager.hashes;
+}
+
+function getHashCap() {
+  return Player.hashManager.capacity;
+}
+
+function totalProduction() {
+  let total = 0;
+  for (let i = 0; i < Player.hacknetNodes.length; ++i) {
+    const node = Player.hacknetNodes[i];
+    if (hasHacknetServers()) {
+      if (node instanceof HacknetNode) throw new Error("node was hacknet node"); // should never happen
+      const hserver = GetServer(node);
+      if (!(hserver instanceof HacknetServer)) throw new Error("node was not hacknet server"); // should never happen
+      if (hserver) {
+        total += hserver.hashRate;
+      } else {
+        console.warn(`Could not find Hacknet Server object in AllServers map (i=${i})`);
+      }
+    } else {
+      if (typeof node === "string") throw new Error("node was ip string"); // should never happen
+      total += node.moneyGainRatePerSecond;
+    }
+  }
+  return total;
+}
+
+export function PlayerInfo(): React.ReactElement {
   const rows: React.ReactNode[][] = [];
-  rows.push(["Money Spent:", <Money key="money" money={-Player.moneySourceA.hacknet_expenses || 0} />]);
-  rows.push(["Money Produced:", <Money key="money" money={Player.moneySourceA.hacknet} />]);
-  if (hasServers) {
+  rows.push([
+    "Money Spent:",
+    <EventUpdater key="spent" events={GameCycleEvents} generator={moneySpent}>
+      {(x) => <Money money={x} />}
+    </EventUpdater>,
+  ]);
+  rows.push([
+    "Money Produced:",
+    <EventUpdater key="produced" events={GameCycleEvents} generator={moneyProduced}>
+      {(x) => <Money money={x} />}
+    </EventUpdater>,
+  ]);
+  if (hasHacknetServers()) {
     rows.push([
       "Hashes:",
-      <span key={"hashes"}>
-        <Hashes hashes={Player.hashManager.hashes} /> / <Hashes hashes={Player.hashManager.capacity} />
+      <span key="hashes">
+        <EventUpdater events={GameCycleEvents} generator={getHashes}>
+          {(x) => <Hashes hashes={x} />}
+        </EventUpdater>
+        /
+        <EventUpdater events={GameCycleEvents} generator={getHashCap}>
+          {(x) => <Hashes hashes={x} />}
+        </EventUpdater>
       </span>,
     ]);
     rows.push([
@@ -39,17 +93,27 @@ export function PlayerInfo(props: IProps): React.ReactElement {
         key="moneyRate"
         title={
           <Typography>
-            <MoneyRate money={(props.totalProduction * 1e6) / 4} /> if sold for money
+            <EventUpdater events={GameCycleEvents} generator={totalProduction}>
+              {(x) => <MoneyRate money={(x * 1e6) / 4} />}
+            </EventUpdater>{" "}
+            if sold for money
           </Typography>
         }
       >
         <span>
-          <HashRate key="hashRate" hashes={props.totalProduction} />
+          <EventUpdater key="hashRate" events={GameCycleEvents} generator={totalProduction}>
+            {(x) => <HashRate hashes={x} />}
+          </EventUpdater>
         </span>
       </Tooltip>,
     ]);
   } else {
-    rows.push(["Production Rate:", <MoneyRate key="moneyRate" money={props.totalProduction} />]);
+    rows.push([
+      "Production Rate:",
+      <EventUpdater key="moneyRate" events={GameCycleEvents} generator={totalProduction}>
+        {(x) => <MoneyRate money={x} />}
+      </EventUpdater>,
+    ]);
   }
 
   return (
