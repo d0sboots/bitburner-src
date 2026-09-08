@@ -17,7 +17,7 @@ export function Generic_toJSON<T extends Record<string, any>>(
   obj: T,
   keys: readonly string[] | null,
 ): IReviverValue {
-  if (keys == null) {
+  if (keys === null) {
     // Spread-syntax is generally the fastest way to shallow-clone an object.
     // This copies enumerable own properties, the same as the Object.entries()
     // loop that it replaced.
@@ -48,9 +48,9 @@ export function Generic_fromJSON<T extends object>(
 ): T {
   assertObject(data);
   const obj = new ctor();
-  if (keys == null) {
+  if (keys === null) {
     // This is an unsafe assignment. We may load data with wrong types at runtime.
-    return Object.assign(obj, data) as T;
+    return Object.assign(obj, data);
   }
   // If keys were provided, just load the provided keys (if they are in the data)
   for (const key of keys) {

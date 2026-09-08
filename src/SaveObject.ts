@@ -274,7 +274,7 @@ export async function importGame(
         // Save modified data back to saveData
         parsedSaveData.data.SettingsSave = JSON.stringify(settings, Replacer);
         // This does *not* use Replacer, because parsedSaveData is in
-        // IReviverData form already (it was never properly Revived).
+        // IReviverValue form already (it was never properly Revived).
         saveData = await encodeJsonSaveString(JSON.stringify(parsedSaveData));
       }
     } catch (error) {

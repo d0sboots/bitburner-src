@@ -55,7 +55,7 @@ type JsonableInstance = {
   // definitions of toJSON and error due to mismatched types. Classes should
   // be defining jsonReplacer instead, and this way the mistake is caught at
   // build time.
-  toJSON?: (badArgument: number) => number;
+  toJSON?: never;
 };
 
 // These are fields on the class itself, i.e. static functions and the constructor.
@@ -67,7 +67,7 @@ type JsonableClass = (new () => JsonableInstance) & {
   validationData?: ObjectValidator<any>;
   // This is not really part of the interface. It exists to catch accidental
   // definitions of fromJSON and error due to mismatched types.
-  fromJSON?: (badArgument: number) => number;
+  fromJSON?: never;
 };
 
 function isReviverValue(value: unknown): value is IReviverValue {
@@ -110,9 +110,7 @@ export function Reviver(_key: string, value: unknown): any {
   }
 
   const obj =
-    ctor.jsonReviver === undefined
-      ? Generic_fromJSON<Record<string, unknown>>(ctor, value.data, ctor.includedKeys)
-      : ctor.jsonReviver(value);
+    ctor.jsonReviver === undefined ? Generic_fromJSON(ctor, value.data, ctor.includedKeys) : ctor.jsonReviver(value);
   if (ctor.validationData !== undefined) {
     validateObject(obj, ctor.validationData);
   }
@@ -122,7 +120,7 @@ export function Reviver(_key: string, value: unknown): any {
 /**
  * A generic "smart replacer" function.
  * Looks for object values that we know are specially serializable.
- * If it finds them, it either callse Generic_toJSON, or hands it off
+ * If it finds them, it either calls Generic_toJSON, or hands it off
  * to a specialized `jsonReplacer` function.
  */
 export function Replacer(_key: string, value: unknown): unknown {
@@ -141,10 +139,10 @@ export function Replacer(_key: string, value: unknown): unknown {
   }
   // It being in the map asserts that it is the correct type.
   const ctor = value.constructor as JsonableClass;
-  // Typescript no-op: This just defines an optional field.
+  // The constructor is registered as a JsonableClass, so this value may have a jsonReplacer method.
   const maybeReplacer = value as JsonableInstance;
   if (maybeReplacer.jsonReplacer === undefined) {
-    return Generic_toJSON(ctorName, value as Record<string, unknown>, ctor.includedKeys);
+    return Generic_toJSON(ctorName, value, ctor.includedKeys);
   }
   return maybeReplacer.jsonReplacer();
 }
